@@ -135,36 +135,52 @@ void subsample(const BGR rgb[16][16], conv cb[8][8], conv cr[8][8])
 	}
 }
 
-typedef struct {
-	BGR   rgb;
-	color dummy;
-} BGR2;
-
-void subsample2(const BGR rgb[16][16], conv cb[8][8], conv cr[8][8])
+void subsample2(const BGR rgb[16][16], conv Y[2][2][8][8], conv cb[8][8], conv cr[8][8])
 {
-	for (unsigned r = 0; r < 8; r++)
-	for (unsigned c = 0; c < 8; c++)
+	unsigned r, c;
+
+	for (r = 0; r < 16; r += 2)
+	for (c = 0; c < 16; c += 2)
 	{
-		unsigned rr = (r<<1);
-		unsigned cc = (c<<1);
+		//unsigned rr, cc;
+		unsigned i, j, k, l;
+		unsigned sR, sG, sB;
+		unsigned R, G, B;
 
-		BGR2 tmp[4];
+		i = r >> 3, j = c >> 3,
+		k = r & 7, l = c & 7;
 
-		tmp[0].rgb = rgb[rr][cc];
-		tmp[1].rgb = rgb[rr][cc+1];
-		tmp[2].rgb = rgb[rr+1][cc];
-		tmp[3].rgb = rgb[rr+1][cc+1];
+		sR = R = rgb[r][c].Red,
+		sG = G = rgb[r][c].Green,
+		sB = B = rgb[r][c].Blue;
+		Y[i][j][k][l] = RGB2Y(R, G, B)-128;
+
+		sR += R = rgb[r][c+1].Red,
+		sG += G = rgb[r][c+1].Green,
+		sB += B = rgb[r][c+1].Blue;
+		Y[i][j][k][l+1] = RGB2Y(R, G, B)-128;
+
+		sR += R = rgb[r+1][c].Red,
+		sG += G = rgb[r+1][c].Green,
+		sB += B = rgb[r+1][c].Blue;
+		Y[i][j][k+1][l] = RGB2Y(R, G, B)-128;
+
+		sR += R = rgb[r+1][c+1].Red,
+		sG += G = rgb[r+1][c+1].Green,
+		sB += B = rgb[r+1][c+1].Blue;
+		Y[i][j][k+1][l+1] = RGB2Y(R, G, B)-128;
 
 		// calculating an average values
-		color R = (tmp[0].rgb.Red + tmp[1].rgb.Red + tmp[2].rgb.Red + tmp[3].rgb.Red) >> 2;
-		color G = (tmp[0].rgb.Green + tmp[1].rgb.Green + tmp[2].rgb.Green + tmp[3].rgb.Green) >> 2;
-		color B = (tmp[0].rgb.Blue + tmp[1].rgb.Blue + tmp[2].rgb.Blue + tmp[3].rgb.Blue) >> 2;
+		R = sR >> 2,
+		G = sG >> 2,
+		B = sB >> 2;
 
-		cb[r][c] = (conv)RGB2Cb(R, G, B)-128;
-		cr[r][c] = (conv)RGB2Cr(R, G, B)-128;
+		//rr = r >> 1, cc = c >> 1;
+
+		cb[r>>1][c>>1] = (conv)RGB2Cb(R, G, B)-128;
+		cr[r>>1][c>>1] = (conv)RGB2Cr(R, G, B)-128;
 	}
 }
-
 
 extern "C" void dct3(conv pixels[8][8], conv data[8][8]);
 extern "C" void dct4(conv pixels[8][8], conv data[8][8]);
@@ -219,7 +235,7 @@ int main (int argc, char *argv[])
 
 	// Process image by 16x16 blocks, (16x16 because of chroma subsampling)
 	// The resulting image will be truncated on the right/down side
-	// if its width/height is not N*16.
+	// if its width/height is not multiple of 16.
 	// The data is written into <file_jpg> file by write_jpeg() function
 	// which Huffman encoder uses to flush its output, so this file
 	// should be opened before the call of huffman_start().
@@ -232,7 +248,7 @@ int main (int argc, char *argv[])
 				printf("Error: getBlock(%d,%d)\n", x, y);
 				break;
 			}
-
+/*
 			// geting four 8x8 Y-blocks
 			for (unsigned i = 0; i < 2; i++)
 			for (unsigned j = 0; j < 2; j++)
@@ -252,6 +268,9 @@ int main (int argc, char *argv[])
 			}
 			// getting subsampled Cb and Cr
 			subsample(RGB16x16, Cb8x8, Cr8x8);
+*/
+			// getting subsampled Cb and Cr
+			subsample2(RGB16x16, Y8x8, Cb8x8, Cr8x8);
 
 			uint64_t tmj = __rdtsc();
 
