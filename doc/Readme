@@ -2,27 +2,32 @@
 Jpegant - JPEG encoder for embedded applications
 ------------------------------------------------
 
-First of all I want to give credit to giants on wich shoulders I stood and borrowed some ideas and code from:
+First of all I want to give credit to giants on wich shoulders I stood and
+borrowed some ideas and code from:
 
-Santosh for his article about DCT, www.geocities.com/ssavekar, ssavekar@yahoo.com;
-Emil Mikulic for DCT code, dmr.ath.cx;
-Cristi Cuturicu for his JPEG codec code;
-'Embedded JPEG Codec Library' for inspiration and an example of how a code should not be written :), sourceforge.net/projects/mb-jpeg;
+- Santosh for his article about DCT, www.geocities.com/ssavekar, ssavekar@yahoo.com;
+- Emil Mikulic for DCT code, dmr.ath.cx;
+- Cristi Cuturicu for his JPEG codec code;
+- Embedded JPEG Codec Library for inspiration and an example of how a code should
+  not be written :), sourceforge.net/projects/mb-jpeg;
 
-JPEG file decoding utility 'JPEGsnoop' was wery usefull, www.impulseadventure.com/photo/jpeg-snoop.html
+JPEG file decoding utility 'JPEGsnoop' was wery usefull,
+www.impulseadventure.com/photo/jpeg-snoop.html
 
 
 The goal
 --------
 
-To create JPEG encoder that is able to work in microcontrollers/microprocessors. It should be very fast and its code/data should be small.
-The image quality is important too but is not my main concern. No floating point numbers of course.
+To create JPEG encoder that is able to work in microcontrollers/microprocessors.
+It should be very fast and its code/data should be small. The image quality is
+important too but is not my main concern. No floating point numbers of course.
 
 
 Implementation
 --------------
 
-Encoder is written in C, if you see C++ code it should be a support code for some paltform/architecture.
+Encoder is written in C, if you see C++ code it should be a support code for
+some paltform/architecture.
 
 Encoder consists of files:
 dct.c, dct.h	- Discrete Cosine Transform DCT;
@@ -47,9 +52,9 @@ void write_jpeg(const unsigned char buff[], const unsigned size)
 Supported OS-es
 ---------------
 
-At present this code was compiled and run on Linux (Makefile is provided) and Windows.
-It is not difficult to port this code to any architecture, the only concern may be size
-of int type - I asume that it is 32 bit long.
+At present this code was compiled and run on Linux (Makefile is provided)
+and Windows. It is not difficult to port this code to any architecture,
+the only concern may be size of int type - I asume that it is 32 bit long.
 
 
 Regards,
