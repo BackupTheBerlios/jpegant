@@ -127,27 +127,27 @@ const unsigned char zig[64] =
 	63
 };
 
-static const unsigned char std_dc_luminance_nrcodes[17] =
+static const unsigned char std_dc_luminance_nrcodes[16] =
 {
-	0,0,1,5,1,1,1,1,1,1,0,0,0,0,0,0,0
+	0,1,5,1,1,1,1,1,1,0,0,0,0,0,0,0
 };
 static const unsigned char std_dc_luminance_values[12] =
 {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 };
 
-static const unsigned char std_dc_chrominance_nrcodes[17] =
+static const unsigned char std_dc_chrominance_nrcodes[16] =
 {
-	0,0,3,1,1,1,1,1,1,1,1,1,0,0,0,0,0
+	0,3,1,1,1,1,1,1,1,1,1,0,0,0,0,0
 };
 static const unsigned char std_dc_chrominance_values[12] =
 {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 };
 
-static const unsigned char std_ac_luminance_nrcodes[17] =
+static const unsigned char std_ac_luminance_nrcodes[16] =
 {
-	0,0,2,1,3,3,2,4,3,5,5,4,4,0,0,1,0x7d
+	0,2,1,3,3,2,4,3,5,5,4,4,0,0,1,0x7d
 };
 
 static const unsigned char std_ac_luminance_values[162] =
@@ -175,9 +175,9 @@ static const unsigned char std_ac_luminance_values[162] =
 	0xf9, 0xfa
 };
 
-static const unsigned char std_ac_chrominance_nrcodes[17] =
+static const unsigned char std_ac_chrominance_nrcodes[16] =
 {
-	0,0,2,1,2,4,4,3,4,7,5,4,4,0,1,2,0x77
+	0,2,1,2,4,4,3,4,7,5,4,4,0,1,2,0x77
 };
 
 static const unsigned char std_ac_chrominance_values[162] =
@@ -496,26 +496,26 @@ static void write_DHTinfo(void)
 
 	writebyte(0); // HTYDCinfo
 	for (i = 0; i < 16; i++) 
-		writebyte(std_dc_luminance_nrcodes[i+1]);
+		writebyte(std_dc_luminance_nrcodes[i]);
 	for (i = 0; i < 12; i++) 
 		writebyte(std_dc_luminance_values[i]);
 
 	writebyte(0x10); // HTYACinfo
 	for (i = 0; i < 16; i++)
-		writebyte(std_ac_luminance_nrcodes[i+1]);
+		writebyte(std_ac_luminance_nrcodes[i]);
 	for (i = 0; i < 162; i++)
 		writebyte(std_ac_luminance_values[i]);
 	
 
 	writebyte(1); // HTCbDCinfo
 	for (i = 0; i < 16; i++)
-		writebyte(std_dc_chrominance_nrcodes[i+1]);
+		writebyte(std_dc_chrominance_nrcodes[i]);
 	for (i = 0; i < 12; i++)
 		writebyte(std_dc_chrominance_values[i]);
 	
 	writebyte(0x11); // HTCbACinfo = 0x11;
 	for (i = 0; i < 16; i++)
-		writebyte(std_ac_chrominance_nrcodes[i+1]);
+		writebyte(std_ac_chrominance_nrcodes[i]);
 	for (i = 0; i < 162; i++)
 		writebyte(std_ac_chrominance_values[i]);
 }
@@ -558,8 +558,8 @@ static void writebits(bitbuffer_t *const pbb, unsigned bits, unsigned nbits)
 
 static void flushbits(bitbuffer_t *pbb)
 {
-	if (pbb->n & 3)
-		writebits(pbb, 0, 8-(pbb->n & 3));
+	if (pbb->n)
+		writebits(pbb, 0xFF, 8 - pbb->n);
 }
 
 /******************************************************************************
@@ -673,10 +673,12 @@ void huffman_encode(huffman_t *const ctx, const conv data[])
 	diff = dc - ctx->dc;
 	ctx->dc = dc;
 
-	bits = huffman_bits(diff);
-	magn = huffman_magnitude(diff);
+	bits = huffman_bits(diff); // VLI
+	magn = huffman_magnitude(diff); // VLI length
 
+	// encode VLI length
 	writebits(&bitbuf, ctx->hdcbit[magn], ctx->hdclen[magn]);
+	// encode VLI itself
 	writebits(&bitbuf, bits, magn);
 
 	for (zerorun = 0, i = 1; i < 64; i++)

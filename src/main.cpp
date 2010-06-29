@@ -301,6 +301,13 @@ int main (int argc, char *argv[])
 
 			jpgclk += __rdtsc() - tmj;
 #ifdef INVERSE
+			quantization_lum(Y8x8[0][0]);
+			quantization_lum(Y8x8[0][1]);
+			quantization_lum(Y8x8[1][0]);
+			quantization_lum(Y8x8[1][1]);
+			quantization_chrom(Cb8x8);
+			quantization_chrom(Cr8x8);
+
 			dump((conv*)Y8x8[0][0], fileY);
 			dump((conv*)Y8x8[0][1], fileY);
 			dump((conv*)Y8x8[1][0], fileY);
@@ -309,23 +316,23 @@ int main (int argc, char *argv[])
 			dump((conv*)Cr8x8, fileCr);
 
 			// inverse DCTs - getting pixels back
-			//iquantization_lum(Y8x8[0][0]);
-			idct2_s(Y8x8[0][0], Y8x8[0][0]);
+			iquantization_lum(Y8x8[0][0]);
+			idct3(Y8x8[0][0], Y8x8[0][0]);
 			//correct_color(Y8x8[0][0]);
-			//iquantization_lum(Y8x8[0][1]);
-			idct2_s(Y8x8[0][1], Y8x8[0][1]);
+			iquantization_lum(Y8x8[0][1]);
+			idct3(Y8x8[0][1], Y8x8[0][1]);
 			//correct_color(Y8x8[0][1]);
-			//iquantization_lum(Y8x8[1][0]);
-			idct2_s(Y8x8[1][0], Y8x8[1][0]);
+			iquantization_lum(Y8x8[1][0]);
+			idct3(Y8x8[1][0], Y8x8[1][0]);
 			//correct_color(Y8x8[1][0]);
-			//iquantization_lum(Y8x8[1][1]);
-			idct2_s(Y8x8[1][1], Y8x8[1][1]);
+			iquantization_lum(Y8x8[1][1]);
+			idct3(Y8x8[1][1], Y8x8[1][1]);
 			//correct_color(Y8x8[1][1]);
-			//iquantization_chrom(Cb8x8);
-			idct2_s(Cb8x8, Cb8x8);
+			iquantization_chrom(Cb8x8);
+			idct3(Cb8x8, Cb8x8);
 			//correct_color(Cb8x8);
-			//iquantization_chrom(Cr8x8);
-			idct2_s(Cr8x8, Cr8x8);
+			iquantization_chrom(Cr8x8);
+			idct3(Cr8x8, Cr8x8);
 			//correct_color(Cr8x8);
 
 			for (unsigned i = 0; i < 2; i++)
