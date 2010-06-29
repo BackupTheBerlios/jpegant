@@ -15,6 +15,7 @@ uint64_t idctclk = 0;
 
 // DCT basis functions coeficients
 int dct_tbl_i[8][8];
+float dct_tbl[8][8];
 
 CACHE_ALIGN short dct_tbl_s[8][8] =
 {
@@ -48,6 +49,7 @@ CACHE_ALIGN short idct_tbl_s[8][8] =
 **  Lowest frequencies are at the upper-left corner.
 **  The input and output could point at the same array, in this case the data
 **  will be overwritten.
+**  9 multiplications ans 33 additions for 1D DCT.
 **  
 **  ARGUMENTS:
 **      pixels  - 8x8 pixel array;
@@ -203,6 +205,7 @@ void dct_fill_tab()
 
 			double K = Cu * cos((double)(2*x+1) * (double)u * PI/16.0);
 			dct_tbl_i[u][x] = K * IDCTI_AMP;
+			dct_tbl[u][x] = K;
 			//dct_tbl_s[u][x] = K * IDCTI_AMP;
 			//idct_tbl_s[x][u] = K * IDCTI_AMP; // different order
 
@@ -339,7 +342,7 @@ __inline static int sdiv(const int data, const int quant, const unsigned mag)
 	//return (data + ((data<0)? -quant: quant))/(1<<mag);
 }
 
-// simple but fast DCT
+// simple but fast DCT - 22 multiplication and 28 additions. 
 void dct3(conv pixels[8][8], conv data[8][8])
 {
 	CACHE_ALIGN int rows[8][8];
@@ -423,104 +426,94 @@ void dct3(conv pixels[8][8], conv data[8][8])
 	dctclk += __rdtsc() - a;
 }
 
-// fast DCT, Vetterli & Ligtenberg
+// fast DCT, Vetterli & Ligtenberg - 16 multiplications and 26 additions.
 void dct4(conv pixels[8][8], conv data[8][8])
 {
-	int rows[8][8];
 	unsigned i;
+	short    rows[8][8];
 
-	static const int
-		C1 = 16069,// cos(1*Pi/16) = 0.9808 * 16384
-		C2 = 15137,// cos(2*Pi/16) = 0.9239
+	static const short
+		C1 = 16070,// cos(1*Pi/16) = 0.9808 * 16384
+		S6 = 15137,// sin(6*Pi/16) = 0.9239
 		C3 = 13623,// cos(3*Pi/16) = 0.8315
-		C4 = 11585,// cos(4*Pi/16) = 0.7071
-		C5 = 9102, // cos(5*Pi/16) = 0.5556
+		C4 = 11586,// cos(4*Pi/16) = 0.7071
+		S3 = 9102, // sin(3*Pi/16) = 0.5556
 		C6 = 6270, // cos(6*Pi/16) = 0.3827
-		C7 = 3197; // cos(7*Pi/16) = 0.1951
-
-	uint64_t a = __rdtsc();
+		S1 = 3196; // sin(1*Pi/16) = 0.1951
 
 	/* transform rows */
 	for (i = 0; i < 8; i++)
 	{
-		int s07,s12,s34,s56;
-		int d07,d12,d34,d56;
-		int x, y;
+		short s07,s12,s34,s56;
+		short d07,d12,d34,d56;
+		short x, y;
 
 		s07 = pixels[i][0] + pixels[i][7];
 		d07 = pixels[i][0] - pixels[i][7];
-
 		s12 = pixels[i][1] + pixels[i][2];
 		d12 = pixels[i][1] - pixels[i][2];
-		
 		s34 = pixels[i][3] + pixels[i][4];
 		d34 = pixels[i][3] - pixels[i][4];
-
 		s56 = pixels[i][5] + pixels[i][6];
 		d56 = pixels[i][5] - pixels[i][6];
 
 		x = s07 + s34;
 		y = s12 + s56;
-		rows[i][0] = C4*(x + y)/32768;
-		rows[i][4] = C4*(x - y)/32768;
+		rows[i][0] = C4*(x + y) >> 15;
+		rows[i][4] = C4*(x - y) >> 15;
 
 		x = d12 - d56;
 		y = s07 - s34;
-		rows[i][2] = (C6*x + C2*y)/32768;
-		rows[i][6] = (C6*y - C2*x)/32768;
+		rows[i][2] = (C6*x + S6*y) >> 15;
+		rows[i][6] = (C6*y - S6*x) >> 15;
 
 		x = d07 - (C4*(s12 - s56) >> 14);
 		y = d34 - (C4*(d12 + d56) >> 14);
-		rows[i][3] = (C3*x - C5*y)/32768;
-		rows[i][5] = (C5*x + C3*y)/32768;
+		rows[i][3] = (C3*x - S3*y) >> 15;
+		rows[i][5] = (S3*x + C3*y) >> 15;
 
-		x = d07*2 - x;
-		y = d34*2 - y;
-		rows[i][1] = (C1*x + C7*y)/32768;
-		rows[i][7] = (C7*x - C1*y)/32768;
+		x = (d07 << 1) - x;
+		y = (d34 << 1) - y;
+		rows[i][1] = (C1*x + S1*y) >> 15;
+		rows[i][7] = (S1*x - C1*y) >> 15;
 	}
 
 	/* transform columns */
 	for (i = 0; i < 8; i++)
 	{
-		int s07,s12,s34,s56;
-		int d07,d12,d34,d56;
-		int x, y;
+		short s07,s12,s34,s56;
+		short d07,d12,d34,d56;
+		short x, y;
 
 		s07 = rows[0][i] + rows[7][i];
 		d07 = rows[0][i] - rows[7][i];
-
 		s12 = rows[1][i] + rows[2][i];
 		d12 = rows[1][i] - rows[2][i];
-
 		s34 = rows[3][i] + rows[4][i];
 		d34 = rows[3][i] - rows[4][i];
-
 		s56 = rows[5][i] + rows[6][i];
 		d56 = rows[5][i] - rows[6][i];
 
 		x = s07 + s34;
 		y = s12 + s56;
-		data[0][i] = C4*(x + y)/32768;
-		data[4][i] = C4*(x - y)/32768;
+		data[0][i] = C4*(x + y) >> 15;
+		data[4][i] = C4*(x - y) >> 15;
 
 		x = d12 - d56;
 		y = s07 - s34;
-		data[2][i] = (C6*x + C2*y)/32768;
-		data[6][i] = (C6*y - C2*x)/32768;
+		data[2][i] = (C6*x + S6*y) >> 15;
+		data[6][i] = (C6*y - S6*x) >> 15;
 
 		x = d07 - (C4*(s12 - s56) >> 14);
 		y = d34 - (C4*(d12 + d56) >> 14);
-		data[3][i] = (C3*x - C5*y)/32768;
-		data[5][i] = (C5*x + C3*y)/32768;
+		data[3][i] = (C3*x - S3*y) >> 15;
+		data[5][i] = (S3*x + C3*y) >> 15;
 
-		x = d07*2 - x;
-		y = d34*2 - y;
-		data[1][i] = (C1*x + C7*y)/32768;
-		data[7][i] = (C7*x - C1*y)/32768;
+		x = (d07 << 1) - x;
+		y = (d34 << 1) - y;
+		data[1][i] = (C1*x + S1*y) >> 15;
+		data[7][i] = (S1*x - C1*y) >> 15;
 	}
-
-	dctclk += __rdtsc() - a;
 }
 
 void dct5(conv pixels[8][8], conv data[8][8])
@@ -693,8 +686,8 @@ void idct2(conv data[8][8], conv pixel[8][8])
 	}
 
 	idctclk += __rdtsc() - a;
-}*/
-
+}
+*/
 
 /* inverse integer DCT 
 void idct2_i(conv data[8][8], conv pixel[8][8])
@@ -808,3 +801,93 @@ void idct2_s(conv data[8][8], conv pixel[8][8])
 }
 
 #endif//_MSC_VER
+
+// simple but fast IDCT
+void idct3(short data[8][8], short pixel[8][8])
+{
+	CACHE_ALIGN short rows[8][8];
+	unsigned i;
+
+	static const short // Ci = cos(i*PI/16)*(1<<14);
+        C1 = 16070,
+        C2 = 15137,
+        C3 = 13623,
+        C4 = 11586,
+        C5 = 9103,
+        C6 = 6270,
+        C7 = 3196;
+
+	/* transform rows */
+	for (i = 0; i < 8; i++)
+	{
+		const short x0 = data[i][0];
+		const short x4 = data[i][4];
+		const short t0 = C4*(x0 + x4) >> 15;
+		const short t4 = C4*(x0 - x4) >> 15;
+
+		const short x2 = data[i][2];
+		const short x6 = data[i][6];
+		const short t2 = (C2*x2 + C6*x6) >> 15; 
+		const short t6 = (C6*x2 - C2*x6) >> 15; 
+
+		const short e0 = t0 + t2; 
+		const short e3 = t0 - t2; 
+		const short e1 = t4 + t6; 
+		const short e2 = t4 - t6; 
+
+		const short x1 = data[i][1];
+		const short x3 = data[i][3];
+		const short x5 = data[i][5];
+		const short x7 = data[i][7];
+		const short o0 = (C1*x1 + C5*x5 + C3*x3 + C7*x7) >> 15;
+		const short o1 = (C3*x1 - C1*x5 - C7*x3 - C5*x7) >> 15;
+		const short o2 = (C5*x1 + C7*x5 - C1*x3 + C3*x7) >> 15;
+		const short o3 = (C7*x1 + C3*x5 - C5*x3 - C1*x7) >> 15;
+
+		rows[i][0] = e0 + o0;
+		rows[i][7] = e0 - o0;
+		rows[i][1] = e1 + o1;
+		rows[i][6] = e1 - o1;
+		rows[i][2] = e2 + o2;
+		rows[i][5] = e2 - o2;
+		rows[i][3] = e3 + o3;
+		rows[i][4] = e3 - o3;
+	}
+
+	/* transform columns */
+	for (i = 0; i < 8; i++)
+	{
+		const short x0 = rows[0][i];
+		const short x4 = rows[4][i];
+		const short t0 = C4*(x0 + x4) >> 15;
+		const short t4 = C4*(x0 - x4) >> 15;
+
+		const short x2 = rows[2][i];
+		const short x6 = rows[6][i];
+		const short t2 = (C2*x2 + C6*x6) >> 15; 
+		const short t6 = (C6*x2 - C2*x6) >> 15; 
+
+		const short e0 = t0 + t2; 
+		const short e3 = t0 - t2; 
+		const short e1 = t4 + t6; 
+		const short e2 = t4 - t6; 
+
+		const short x1 = rows[1][i];
+		const short x3 = rows[3][i];
+		const short x5 = rows[5][i];
+		const short x7 = rows[7][i];
+		const short o0 = (C1*x1 + C5*x5 + C3*x3 + C7*x7) >> 15;
+		const short o1 = (C3*x1 - C1*x5 - C7*x3 - C5*x7) >> 15;
+		const short o2 = (C5*x1 + C7*x5 - C1*x3 + C3*x7) >> 15;
+		const short o3 = (C7*x1 + C3*x5 - C5*x3 - C1*x7) >> 15;
+
+		pixel[0][i] = e0 + o0;
+		pixel[7][i] = e0 - o0;
+		pixel[1][i] = e1 + o1;
+		pixel[6][i] = e1 - o1;
+		pixel[2][i] = e2 + o2;
+		pixel[5][i] = e2 - o2;
+		pixel[3][i] = e3 + o3;
+		pixel[4][i] = e3 - o3;
+	}
+}

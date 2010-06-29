@@ -19,6 +19,7 @@ void dct2_s(conv pixel[8][8], conv data[8][8]);
 // inverse real DCT
 void idct(conv data[8][8], conv pixel[8][8]);
 void idct2(conv data[8][8], conv pixel[8][8]);
+void idct3(short data[8][8], short pixel[8][8]);
 // inverse integer DCT 
 void idct2_i(conv data[8][8], conv pixel[8][8]);
 void idct2_s(conv data[8][8], conv pixel[8][8]);
