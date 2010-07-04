@@ -1,25 +1,25 @@
 
-const unsigned char std_dc_luminance_nrcodes[17] =
+const unsigned char std_dc_luminance_nrcodes[16] =
 {
-	0,0,1,5,1,1,1,1,1,1,0,0,0,0,0,0,0
+	0,1,5,1,1,1,1,1,1,0,0,0,0,0,0,0
 };
 const unsigned char std_dc_luminance_values[12] =
 {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 };
 
-const unsigned char std_dc_chrominance_nrcodes[17] =
+const unsigned char std_dc_chrominance_nrcodes[16] =
 {
-	0,0,3,1,1,1,1,1,1,1,1,1,0,0,0,0,0
+	0,3,1,1,1,1,1,1,1,1,1,0,0,0,0,0
 };
 const unsigned char std_dc_chrominance_values[12] =
 {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 };
 
-const unsigned char std_ac_luminance_nrcodes[17] =
+const unsigned char std_ac_luminance_nrcodes[16] =
 {
-	0,0,2,1,3,3,2,4,3,5,5,4,4,0,0,1,0x7d
+	0,2,1,3,3,2,4,3,5,5,4,4,0,0,1,0x7d
 };
 
 const unsigned char std_ac_luminance_values[162] =
@@ -47,9 +47,9 @@ const unsigned char std_ac_luminance_values[162] =
 	0xf9, 0xfa
 };
 
-const unsigned char std_ac_chrominance_nrcodes[17] =
+const unsigned char std_ac_chrominance_nrcodes[16] =
 {
-	0,0,2,1,2,4,4,3,4,7,5,4,4,0,1,2,0x77
+	0,2,1,2,4,4,3,4,7,5,4,4,0,1,2,0x77
 };
 
 const unsigned char std_ac_chrominance_values[162] =

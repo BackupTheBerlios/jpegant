@@ -30,7 +30,7 @@ static void huffman_tree_print(
 		{
 			unsigned char code = codes[k++];
 			unsigned bits = skip+j;
-			unsigned nbits = i;
+			unsigned nbits = i+1;
 
 			printf("code=%3d nbits=%2d bits=0x%04x\n", code, nbits, bits);
 		}
@@ -66,7 +66,7 @@ static void huffman_tree_print_sorted(
 			unsigned n = codes[k];
 
 			el[n].pos   = k;
-			el[n].nbits = i;
+			el[n].nbits = i+1;
 			el[n].bits  = skip+j;
 
 			elmax = max(elmax, n);
