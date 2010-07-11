@@ -11,22 +11,18 @@ RGB to YCbCr Conversion:
 // Y = 0.299*R + 0.587*G + 0.114*B
 __inline color RGB2Y(const color r, const color g, const color b)
 {
-	return (153*r + 301*g + 58*b)>>9;
+	return (32768 + 19595*r + 38470*g + 7471*b) >> 16;
 }
-// Cb = -0.1687*R - 0.3313*G + 0.5*B + 128
+// Cb = 128 - 0.1687*R - 0.3313*G + 0.5*B
 __inline color RGB2Cb(const color r, const color g, const color b)
 {
-	return (65536 - 86*r - 170*g + 256*b)>>9;
+	return (8421376 - 11058*r - 21709*g + 32767*b) >> 16;
 }
-// Cr = 0.5*R - 0.4187*G - 0.0813*B + 128
+// Cr = 128 + 0.5*R - 0.4187*G - 0.0813*B
 __inline color RGB2Cr(const color r, const color g, const color b)
 {
-	return (65536 + 256*r - 214*g - 42*b)>>9;
+	return (8421376 + 32767*r - 27438*g - 5329*b) >> 16;
 }
-
-//#define RGB2Y(r, g, b)    ((153*r + 301*g + 58*b)/512)
-//#define RGB2Cb(r, g, b)   ((65536 - 86*r - 170*g + 256*b)/512)
-//#define RGB2Cr(r, g, b)   ((65536 + 256*r - 214*g - 42*b)/512)
 
 // quantization table
 //extern const unsigned char qtable_lum[8][8];

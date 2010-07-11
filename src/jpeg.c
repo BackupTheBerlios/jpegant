@@ -54,7 +54,7 @@ const unsigned char qtable_paint_chrom[8][8] =
 */
 
 
-#define QTAB_DIV	512
+#define QTAB_SCALE	10
 
 // as you can see I use Paint tables
 static const unsigned char qtable_0_lum[8][8] =
@@ -81,7 +81,7 @@ static const unsigned char qtable_0_chrom[8][8] =
 	{50, 50, 50, 50, 50, 50, 50, 50}
 };
 
-// 1024/qtable_0_lum[][]
+// (1 << QTAB_SCALE)/qtable_0_lum[][]
 static const unsigned char qtable_lum[8][8] =
 {
 	{128,171,205,128, 85, 51, 39, 33},
@@ -94,7 +94,7 @@ static const unsigned char qtable_lum[8][8] =
 	{ 28, 22, 21, 21, 18, 20, 20, 20}
 };
 
-// 1024/qtable_0_chrom[][]
+// (1 << QTAB_SCALE)/qtable_0_chrom[][]
 static const unsigned char qtable_chrom[8][8] =
 {
 	{114,114, 85, 43, 20, 20, 20, 20},
@@ -327,9 +327,24 @@ bitbuffer_t;
 static bitbuffer_t bitbuf;
 
 
-static conv quantize(const conv data, const unsigned char qt)
+/******************************************************************************
+**  quantize
+**  --------------------------------------------------------------------------
+**  DCT coeficient quantization.
+**  To avoid division function uses quantization coefs amplified by 2^QTAB_SCALE
+**  and then shifts the product by QTAB_SCALE bits to the right.
+**  To make this operation a bit faster some tricks are used but it is just
+**  returns round(data[i]/qt0[i]).
+**  
+**  ARGUMENTS:
+**      data    - DCT freq value;
+**      qt      - quantization value ( (1 << QTAB_SCALE)/qt0 );
+**
+**  RETURN: quantized value.
+******************************************************************************/
+static short quantize(const short data, const unsigned short qt)
 {
-	return (data*qt + QTAB_DIV-((unsigned)data>>31))>>10;
+	return (data*qt - (data>>15) + ((1<<(QTAB_SCALE-1))-1)) >> QTAB_SCALE;
 }
 
 /******************************************************************************
@@ -337,10 +352,6 @@ static conv quantize(const conv data, const unsigned char qt)
 **  --------------------------------------------------------------------------
 **  DCT coeficients quantization to discard weak high frequencies.
 **  This function processes 8x8 DCT blocks inplace.
-**  To avoid division function uses quantization coefs amplified by 2^10 and
-**  then shifts the product by 10 bits to the right.
-**  To make this operation a bit faster some tricks are used but it is just
-**    return round(data[i]/qt0[i]);
 **  
 **  ARGUMENTS:
 **      data    - 8x8 DCT freq block;
@@ -348,7 +359,7 @@ static conv quantize(const conv data, const unsigned char qt)
 **
 **  RETURN: -
 ******************************************************************************/
-static void quantization(conv data[], const unsigned char qt[])
+static void quantization(short data[], const unsigned char qt[])
 {
 	unsigned i;
 
@@ -361,17 +372,17 @@ static void quantization(conv data[], const unsigned char qt[])
 	}
 }
 
-void quantization_lum(conv data[8][8])
+void quantization_lum(short data[8][8])
 {
-	quantization((conv*)data, (const unsigned char*)qtable_lum);
+	quantization((short*)data, (const unsigned char*)qtable_lum);
 }
 
-void quantization_chrom(conv data[8][8])
+void quantization_chrom(short data[8][8])
 {
-	quantization((conv*)data, (const unsigned char*)qtable_chrom);
+	quantization((short*)data, (const unsigned char*)qtable_chrom);
 }
 
-static void iquantization(conv data[8][8], const unsigned char qt[8][8])
+static void iquantization(short data[8][8], const unsigned char qt[8][8])
 {
 	unsigned r, c;
 
@@ -386,15 +397,29 @@ static void iquantization(conv data[8][8], const unsigned char qt[8][8])
 	}
 }
 
-void iquantization_lum(conv data[8][8])
+void iquantization_lum(short data[8][8])
 {
 	iquantization(data, qtable_0_lum);
 }
 
-void iquantization_chrom(conv data[8][8])
+void iquantization_chrom(short data[8][8])
 {
 	iquantization(data, qtable_0_chrom);
 }
+
+/******************************************************************************
+**  writebyte
+**  --------------------------------------------------------------------------
+**  This function writes byte into output buffer
+**  and flushes the buffer if it is full.
+**  
+**  unsigned char jpgbuff - global output buffer;
+**  unsigned      jpgn    - the buffer index;
+**  
+**  ARGUMENTS: b - byte;
+**
+**  RETURN: -
+******************************************************************************/
 
 // code-stream output counter
 static unsigned jpgn = 0;
@@ -538,6 +563,7 @@ static void writebits(bitbuffer_t *const pbb, unsigned bits, unsigned nbits)
 	// shift old bits to the left, add new to the right
 	pbb->buf = (pbb->buf << nbits) | (bits & ((1 << nbits)-1));
 
+	// new number of bits
 	nbits += pbb->n;
 
 	// flush whole bytes
@@ -549,13 +575,26 @@ static void writebits(bitbuffer_t *const pbb, unsigned bits, unsigned nbits)
 
 		writebyte(b);
 
-		if (b == 0xFF) // replace 0xFF with 0xFF00
-			writebyte(0);
+		if (b == 0xFF)
+			writebyte(0); // add 0x00 after 0xFF
 	}
 
+	// remember how many bits is remained
 	pbb->n = nbits;
 }
 
+/******************************************************************************
+**  flushbits
+**  --------------------------------------------------------------------------
+**  Flush bits into bit-buffer.
+**  If there is not an integer number of bytes in bit-buffer - add 1-s
+**  and write these bytes.
+**  
+**  ARGUMENTS:
+**      pbb     - pointer to bit-buffer context;
+**
+**  RETURN: -
+******************************************************************************/
 static void flushbits(bitbuffer_t *pbb)
 {
 	if (pbb->n)
@@ -565,22 +604,24 @@ static void flushbits(bitbuffer_t *pbb)
 /******************************************************************************
 **  huffman_bits
 **  --------------------------------------------------------------------------
-**  Converst amplitude into the representation suitable for Huffman encoder.
+**  Converst amplitude into the representation suitable for Jpeg encoder -
+**  so called "Baseline Entropy Coding Symbol-2" or variable length integer VLI
+**  Unsignificant higher bits will be dropped later.
 **  
 **  ARGUMENTS:
 **      value    - DCT amplitude;
 **
 **  RETURN: huffman bits
 ******************************************************************************/
-static unsigned huffman_bits(const conv value)
+static unsigned huffman_bits(const short value)
 {
-	return value - ((unsigned)value >> 31);
+	return value + (value >> 15);
 }
 
 /******************************************************************************
 **  huffman_magnitude
 **  --------------------------------------------------------------------------
-**  Calculates magnitude of an amplitude - the number of bits that are enough
+**  Calculates magnitude of an VLI integer - the number of bits that are enough
 **  to represent given value.
 **  
 **  ARGUMENTS:
@@ -588,7 +629,7 @@ static unsigned huffman_bits(const conv value)
 **
 **  RETURN: magnitude
 ******************************************************************************/
-static unsigned huffman_magnitude(const conv value)
+static unsigned huffman_magnitude(const short value)
 {
 	unsigned x = (value < 0)? -value: value;
 	unsigned m = 0;
@@ -663,12 +704,13 @@ void huffman_stop(void)
 **
 **  RETURN: -
 ******************************************************************************/
-void huffman_encode(huffman_t *const ctx, const conv data[])
+void huffman_encode(huffman_t *const ctx, const short data[])
 {
 	unsigned magn, bits;
 	unsigned zerorun, i;
-	conv     diff;
-	conv     dc = quantize(data[0], ctx->qtable[0]);
+	short    diff;
+
+	short    dc = quantize(data[0], ctx->qtable[0]);
 	// difference between old and new DC
 	diff = dc - ctx->dc;
 	ctx->dc = dc;
@@ -683,7 +725,7 @@ void huffman_encode(huffman_t *const ctx, const conv data[])
 
 	for (zerorun = 0, i = 1; i < 64; i++)
 	{
-		const conv ac = quantize(data[zig[i]], ctx->qtable[zig[i]]);
+		const short ac = quantize(data[zig[i]], ctx->qtable[zig[i]]);
 
 		if (ac) {
 			while (zerorun >= 16) {
